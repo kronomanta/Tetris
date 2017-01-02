@@ -20,6 +20,8 @@ public class BoardManager : MonoBehaviour
 
     public void BuildBoard(List<int[]> board)
     {
+        System.DateTime start = System.DateTime.Now;
+
         if (_blocks == null)
         {
             _blocks = new GameObject[board.Count][];
@@ -36,43 +38,43 @@ public class BoardManager : MonoBehaviour
             var boardRow = board[yindex];
             for (int x = 0; x < row.Length; x++)
             {
-                if (row[x] == null && boardRow[x] != 0)
-                {
-                    //0 -> 1
-                    CreateBlock(x, y, boardRow[x]);
-                }
-                else if (row[x] != null && boardRow[x] == 0)
-                {
-                    //1 -> 0
-                    //delete block
-                    Destroy(row[x]);
-                    row[x] = null;
-                }
+                UpdateBlock(x, y, boardRow[x]);
             }
         }
+
+        Debug.Log("built: " + (System.DateTime.Now - start));
     }
 
-    private void CreateBlock(int x, int y, int spriteHash)
+    private void UpdateBlock(int x, int y, int spriteHash)
     {
         if (spriteHash == 0)
         {
-            _blocks[y][x] = null;
-            return;
-        }
-
-        GameObject block = Instantiate(BlockPrefab, transform.position + new Vector3(x * GridSize, y * GridSize, 0), Quaternion.identity);
-
-        if (spriteHash == 1)
+            //->0
+            GameObject go = _blocks[y][x];
+            if (go == null || !go.activeSelf) return;
+            go.SetActive(false);
+        }else
         {
-            block.GetComponent<SpriteRenderer>().sprite = _borderSprite;
-        }
-        else
-        {
-            int spriteId = spriteHash - 2;
-            block.GetComponent<SpriteRenderer>().sprite = _sprites[spriteId];
-        }
+            //->1
 
+            GameObject go = _blocks[y][x];
+            if (go == null)
+            {
+                go = Instantiate(BlockPrefab, transform.position + new Vector3(x * GridSize, y * GridSize, 0), Quaternion.identity);
+                go.name = "Block -";
+                _blocks[y][x] = go;
+            }
 
-        _blocks[y][x] = block;
+            int spriteId = spriteHash == 1 ? 1 : spriteHash - 2;
+
+            if (go.name.Split('-')[1] != spriteId.ToString())
+            {
+                go.name = "Block -" + spriteId;
+                go.GetComponent<SpriteRenderer>().sprite = spriteHash == 1 ? _borderSprite : _sprites[spriteId];
+            }
+
+            if (!go.activeSelf)
+                go.SetActive(true);
+        }
     }
 }
