@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class BoardManager : MonoBehaviour
 {
-
     public int GridSize = 10;
     public GameObject BlockPrefab;
 
@@ -11,17 +10,17 @@ public class BoardManager : MonoBehaviour
     private GameObject[][] _blocks;
     private Sprite[] _sprites;
     private Sprite _borderSprite;
+    private Transform _myTransform;
 
     public void Init(Sprite[] sprites, Sprite borderSprite)
     {
         _sprites = sprites;
         _borderSprite = borderSprite;
+        _myTransform = transform;
     }
 
     public void BuildBoard(List<int[]> board)
     {
-        System.DateTime start = System.DateTime.Now;
-
         if (_blocks == null)
         {
             _blocks = new GameObject[board.Count][];
@@ -42,25 +41,24 @@ public class BoardManager : MonoBehaviour
             }
         }
 
-        Debug.Log("built: " + (System.DateTime.Now - start));
     }
 
     private void UpdateBlock(int x, int y, int spriteHash)
     {
+        GameObject go = _blocks[y][x];
+
         if (spriteHash == 0)
         {
             //->0
-            GameObject go = _blocks[y][x];
             if (go == null || !go.activeSelf) return;
             go.SetActive(false);
-        }else
+        }
+        else
         {
             //->1
-
-            GameObject go = _blocks[y][x];
             if (go == null)
             {
-                go = Instantiate(BlockPrefab, transform.position + new Vector3(x * GridSize, y * GridSize, 0), Quaternion.identity);
+                go = Instantiate(BlockPrefab, _myTransform.position + new Vector3(x * GridSize, y * GridSize, 0), Quaternion.identity);
                 go.name = "Block -";
                 _blocks[y][x] = go;
             }

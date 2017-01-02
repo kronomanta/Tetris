@@ -19,8 +19,16 @@ public class BlockManager : MonoBehaviour
 
     public Vector2 BoardSize = new Vector2(11, 20);
     public float Speed = 1;
+    public float SpeedStep = .1f;
+    public int SpeedLineStep = 3;
+    public int GUIFPS = 45;
+
+
     public Sprite[] BlockSprites;
     public Sprite BoardSprite;
+
+    private int _completedLines = 0;
+    private bool _boardChanged = false;
 
     private BoardManager _boardManager;
 
@@ -194,6 +202,7 @@ public class BlockManager : MonoBehaviour
     {
         Spawn();
         StartCoroutine(MoveBlockDownCoroutine());
+        StartCoroutine(DrawBoard());
     }
 
     void Spawn()
@@ -210,23 +219,30 @@ public class BlockManager : MonoBehaviour
         position.y = 0;
         position.x = (int)BoardSize.x / 2;
 
-        DrawBoard();
+        WriteBlockToBoard(_board, _currentBlockScript.GetPattern(), position, clear: false);
     }
 
     void WriteBlockToBoard(List<int[]> board)
     {
-        Pattern pattern = _currentBlockScript.GetPattern();
-       
+        WriteBlockToBoard(board, _currentBlockScript.GetPattern(), position, clear: false);
+    }
+
+    void WriteBlockToBoard(List<int[]> board, Pattern pattern, Vector2 position, bool clear)
+    {
         for (int y = 0; y < pattern.SymbolRows.Length; y++)
         {
             for (int x = 0; x < pattern.SymbolRows[y].Length; x++)
             {
                 int posy = y + (int)position.y;
                 int posx = x + (int)position.x;
-                if (board[posy][posx] == 0)
-                    board[posy][posx] = pattern.SymbolRows[y][x];
+                if (clear || board[posy][posx] == 0)
+                {
+                    board[posy][posx] = clear ? 0 : pattern.SymbolRows[y][x];
+                }
             }
         }
+
+        _boardChanged = true;
     }
 
     IEnumerator MoveBlockDownCoroutine()
@@ -237,7 +253,6 @@ public class BlockManager : MonoBehaviour
 
             //keep moving down
             MoveBlock(Movement.Down);
-            DrawBoard();
         }
         while (gamestate != GameState.GameOver);
     }
@@ -263,23 +278,29 @@ public class BlockManager : MonoBehaviour
 
     void RotateBlock()
     {
-        Pattern pattern = _currentBlockScript.GetNextRotationPattern();
+        Pattern pattern = _currentBlockScript.GetPattern();
+        Pattern nextPattern = _currentBlockScript.GetNextRotationPattern();
 
-        for (int y = 0; y < pattern.Length; y++)
+        for (int y = 0; y < nextPattern.Length; y++)
         {
-            for (int x = 0; x < pattern.Width; x++)
+            for (int x = 0; x < nextPattern.Width; x++)
             {
-                //cannot step
-                if (pattern[y][x] != 0 && _board[y + (int)position.y][x + (int)position.x] != 0) return;
+                WriteBlockToBoard(_board, pattern, position, clear: true);
+
+                if (nextPattern[y][x] != 0 && _board[y + (int)position.y][x + (int)position.x] != 0)
+                {
+                    WriteBlockToBoard(_board, pattern, position, clear: false);
+                    return;
+                }
             }
         }
 
-        _currentBlockScript.RotatePattern();
-        DrawBoard();
+        WriteBlockToBoard(_board, _currentBlockScript.RotatePattern(), position, clear: false);
     }
 
     void MoveBlock(Movement movement)
     {
+        Vector2 lastPosition = position;
         Pattern pattern = _currentBlockScript.GetPattern();
 
         int onePos;
@@ -331,24 +352,23 @@ public class BlockManager : MonoBehaviour
                 break;
         }
 
-        DrawBoard();
+        WriteBlockToBoard(_board, pattern, lastPosition, clear: true);
+        WriteBlockToBoard(_board, pattern, position, clear: false);
     }
 
-    void DrawBoard()
+    IEnumerator DrawBoard()
     {
-        List<int[]> tempBoard = new List<int[]>(_board.Count);
-        for (int i = 0; i < tempBoard.Capacity; i++)
+        do
         {
-            int length = _board[i].Length;
-            int[] row = new int[length];
-            Array.Copy(_board[i], row, length);
-            tempBoard.Add(row);
-        }
+            if (_boardChanged)
+            {
+                _boardChanged = false;
+                DrawBoardToConsole(_board);
+                _boardManager.BuildBoard(_board);
+            }
+            yield return new WaitForSeconds(1f / GUIFPS);
 
-        WriteBlockToBoard(tempBoard);
-
-        DrawBoardToConsole(tempBoard);
-        _boardManager.BuildBoard(tempBoard);
+        } while (gamestate != GameState.GameOver);
     }
 
     void DrawBoardToConsole(List<int[]> board)
@@ -373,6 +393,13 @@ public class BlockManager : MonoBehaviour
                 //completed line
                 _board.RemoveAt(y);
                 y--;
+
+                if ((++_completedLines) % SpeedLineStep == 0)
+                {
+                    Speed += SpeedStep;
+                }
+
+                Debug.Log("CompletedLines: " + _completedLines);
             }
         }
 
@@ -381,6 +408,8 @@ public class BlockManager : MonoBehaviour
             _board.Insert(0, CreateEmptyLine());
         }
 
+
+        
     }
 
     int[] CreateEmptyLine()
